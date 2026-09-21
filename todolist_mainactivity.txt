@@ -1,0 +1,1079 @@
+package com.example.todolistapp
+
+import android.app.DatePickerDialog
+import android.content.Context
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Calendar
+
+
+class MainActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+
+        super.onCreate(savedInstanceState)
+
+        setContent {
+
+            TodoListApp()
+
+        }
+    }
+}
+
+
+/* =====================================================
+   MAIN TODO APP
+   ===================================================== */
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TodoListApp() {
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    var tasks by remember {
+        mutableStateOf(loadTasks(context))
+    }
+
+    var showDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var editingTask by remember {
+        mutableStateOf<Task?>(null)
+    }
+
+
+    Scaffold(
+
+        topBar = {
+
+            TopAppBar(
+
+                title = {
+
+                    Column {
+
+                        Text(
+                            text = "My Tasks",
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "Organize your day"
+                        )
+                    }
+                }
+            )
+        }
+
+    ) { paddingValues ->
+
+
+        Column(
+
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+
+
+            if (tasks.isEmpty()) {
+
+                Column(
+
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+
+                    horizontalAlignment = Alignment.CenterHorizontally,
+
+                    verticalArrangement = Arrangement.Center
+                ) {
+
+                    Text(
+                        text = "No tasks yet",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    Text(
+                        text = "Add your first task below"
+                    )
+                }
+
+            } else {
+
+
+                LazyColumn(
+
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+
+
+                    items(
+
+                        items = tasks,
+
+                        key = {
+                            it.id
+                        }
+
+                    ) { task ->
+
+
+                        TaskCard(
+
+                            task = task,
+
+
+                            onComplete = {
+
+                                tasks = tasks.map {
+
+                                    if (it.id == task.id) {
+
+                                        it.copy(
+                                            completed = !it.completed
+                                        )
+
+                                    } else {
+
+                                        it
+                                    }
+
+                                }.toMutableList()
+
+
+                                saveTasks(
+                                    context,
+                                    tasks
+                                )
+                            },
+
+
+                            onEdit = {
+
+                                editingTask = task
+
+                                showDialog = true
+                            },
+
+
+                            onDelete = {
+
+                                tasks = tasks
+                                    .filter {
+                                        it.id != task.id
+                                    }
+                                    .toMutableList()
+
+
+                                saveTasks(
+                                    context,
+                                    tasks
+                                )
+                            }
+                        )
+
+
+                        Spacer(
+                            modifier = Modifier.height(10.dp)
+                        )
+                    }
+                }
+            }
+
+
+            Button(
+
+                onClick = {
+
+                    editingTask = null
+
+                    showDialog = true
+                },
+
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+
+                Text(
+                    text = "+  Add New Task"
+                )
+            }
+        }
+    }
+
+
+    /* ADD / EDIT DIALOG */
+
+    if (showDialog) {
+
+        TaskDialog(
+
+            task = editingTask,
+
+
+            onDismiss = {
+
+                showDialog = false
+            },
+
+
+            onSave = {
+
+                    title,
+                    description,
+                    priority,
+                    dueDate ->
+
+
+                if (editingTask == null) {
+
+
+                    val newTask = Task(
+
+                        id = System.currentTimeMillis(),
+
+                        title = title,
+
+                        description = description,
+
+                        priority = priority,
+
+                        dueDate = dueDate,
+
+                        completed = false
+                    )
+
+
+                    tasks = (
+                            tasks + newTask
+                            ).toMutableList()
+
+
+                } else {
+
+
+                    tasks = tasks.map {
+
+                        if (
+                            it.id ==
+                            editingTask!!.id
+                        ) {
+
+                            it.copy(
+
+                                title = title,
+
+                                description = description,
+
+                                priority = priority,
+
+                                dueDate = dueDate
+                            )
+
+                        } else {
+
+                            it
+                        }
+
+                    }.toMutableList()
+                }
+
+
+                saveTasks(
+                    context,
+                    tasks
+                )
+
+
+                showDialog = false
+            }
+        )
+    }
+}
+
+
+/* =====================================================
+   TASK CARD
+   ===================================================== */
+
+@Composable
+fun TaskCard(
+
+    task: Task,
+
+    onComplete: () -> Unit,
+
+    onEdit: () -> Unit,
+
+    onDelete: () -> Unit
+
+) {
+
+
+    Card(
+
+        modifier = Modifier
+            .fillMaxWidth()
+
+    ) {
+
+
+        Column(
+
+            modifier = Modifier
+                .padding(14.dp)
+
+        ) {
+
+
+            Row(
+
+                modifier = Modifier.fillMaxWidth(),
+
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+
+                Checkbox(
+
+                    checked = task.completed,
+
+                    onCheckedChange = {
+
+                        onComplete()
+
+                    }
+                )
+
+
+                Column(
+
+                    modifier = Modifier.weight(1f)
+
+                ) {
+
+
+                    Text(
+
+                        text = task.title,
+
+                        fontWeight = FontWeight.Bold,
+
+                        style = MaterialTheme
+                            .typography
+                            .titleMedium,
+
+                        textDecoration =
+
+                            if (task.completed)
+
+                                TextDecoration.LineThrough
+
+                            else
+
+                                TextDecoration.None
+                    )
+                }
+
+
+                OutlinedButton(
+
+                    onClick = onEdit
+                ) {
+
+                    Text(
+                        "Edit"
+                    )
+                }
+
+
+                Spacer(
+                    modifier = Modifier.width(4.dp)
+                )
+
+
+                OutlinedButton(
+
+                    onClick = onDelete
+                ) {
+
+                    Text(
+                        "Delete"
+                    )
+                }
+            }
+
+
+            if (task.description.isNotEmpty()) {
+
+
+                Text(
+
+                    text = task.description,
+
+                    modifier = Modifier
+                        .padding(
+                            start = 48.dp,
+                            bottom = 8.dp
+                        ),
+
+                    color = Color.Gray
+                )
+            }
+
+
+            Text(
+
+                text =
+                    "Priority: ${task.priority}",
+
+                modifier = Modifier
+                    .padding(start = 48.dp),
+
+                fontWeight = FontWeight.Bold
+            )
+
+
+            if (task.dueDate.isNotEmpty()) {
+
+
+                Text(
+
+                    text =
+                        "Due Date: ${task.dueDate}",
+
+                    modifier = Modifier
+                        .padding(start = 48.dp)
+                )
+            }
+
+
+            Spacer(
+                modifier = Modifier.height(5.dp)
+            )
+
+
+            Text(
+
+                text =
+
+                    if (task.completed)
+
+                        "Status: Completed"
+
+                    else
+
+                        "Status: Active",
+
+                modifier = Modifier
+                    .padding(start = 48.dp),
+
+                color =
+
+                    if (task.completed)
+
+                        Color(0xFF2E7D32)
+
+                    else
+
+                        Color(0xFF1565C0),
+
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+
+/* =====================================================
+   ADD / EDIT TASK DIALOG
+   ===================================================== */
+
+@Composable
+fun TaskDialog(
+
+    task: Task?,
+
+    onDismiss: () -> Unit,
+
+    onSave: (
+        String,
+        String,
+        String,
+        String
+    ) -> Unit
+
+) {
+
+
+    var title by remember {
+
+        mutableStateOf(
+            task?.title ?: ""
+        )
+    }
+
+
+    var description by remember {
+
+        mutableStateOf(
+            task?.description ?: ""
+        )
+    }
+
+
+    var priority by remember {
+
+        mutableStateOf(
+            task?.priority ?: "Medium"
+        )
+    }
+
+
+    var dueDate by remember {
+
+        mutableStateOf(
+            task?.dueDate ?: ""
+        )
+    }
+
+
+    val context =
+        androidx.compose.ui.platform
+            .LocalContext.current
+
+
+    AlertDialog(
+
+        onDismissRequest = onDismiss,
+
+
+        title = {
+
+            Text(
+
+                if (task == null)
+
+                    "Add New Task"
+
+                else
+
+                    "Edit Task"
+            )
+        },
+
+
+        text = {
+
+            Column(
+
+                modifier = Modifier
+                    .verticalScroll(
+                        rememberScrollState()
+                    )
+            ) {
+
+
+                OutlinedTextField(
+
+                    value = title,
+
+                    onValueChange = {
+
+                        title = it
+                    },
+
+                    label = {
+
+                        Text(
+                            "Task Title"
+                        )
+                    },
+
+                    modifier = Modifier
+                        .fillMaxWidth(),
+
+                    singleLine = true
+                )
+
+
+                Spacer(
+                    modifier = Modifier.height(10.dp)
+                )
+
+
+                OutlinedTextField(
+
+                    value = description,
+
+                    onValueChange = {
+
+                        description = it
+                    },
+
+                    label = {
+
+                        Text(
+                            "Description"
+                        )
+                    },
+
+                    modifier = Modifier
+                        .fillMaxWidth(),
+
+                    minLines = 3
+                )
+
+
+                Spacer(
+                    modifier = Modifier.height(12.dp)
+                )
+
+
+                Text(
+
+                    text = "Priority",
+
+                    fontWeight = FontWeight.Bold
+                )
+
+
+                Spacer(
+                    modifier = Modifier.height(6.dp)
+                )
+
+
+                Row(
+
+                    modifier = Modifier.fillMaxWidth(),
+
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween
+                ) {
+
+
+                    OutlinedButton(
+
+                        onClick = {
+
+                            priority = "Low"
+                        }
+                    ) {
+
+                        Text("Low")
+                    }
+
+
+                    OutlinedButton(
+
+                        onClick = {
+
+                            priority = "Medium"
+                        }
+                    ) {
+
+                        Text("Medium")
+                    }
+
+
+                    OutlinedButton(
+
+                        onClick = {
+
+                            priority = "High"
+                        }
+                    ) {
+
+                        Text("High")
+                    }
+                }
+
+
+                Text(
+
+                    text =
+                        "Selected: $priority",
+
+                    fontWeight = FontWeight.Bold
+                )
+
+
+                Spacer(
+                    modifier = Modifier.height(12.dp)
+                )
+
+
+                Text(
+
+                    text = "Due Date",
+
+                    fontWeight = FontWeight.Bold
+                )
+
+
+                Spacer(
+                    modifier = Modifier.height(5.dp)
+                )
+
+
+                Button(
+
+                    onClick = {
+
+
+                        val calendar =
+                            Calendar.getInstance()
+
+
+                        DatePickerDialog(
+
+                            context,
+
+
+                            { _, year, month, day ->
+
+
+                                dueDate = String.format(
+
+                                    "%02d/%02d/%04d",
+
+                                    day,
+
+                                    month + 1,
+
+                                    year
+                                )
+                            },
+
+
+                            calendar.get(
+                                Calendar.YEAR
+                            ),
+
+
+                            calendar.get(
+                                Calendar.MONTH
+                            ),
+
+
+                            calendar.get(
+                                Calendar.DAY_OF_MONTH
+                            )
+
+                        ).show()
+                    },
+
+                    modifier = Modifier
+                        .fillMaxWidth()
+                ) {
+
+                    Text(
+                        "Select Due Date"
+                    )
+                }
+
+
+                if (dueDate.isNotEmpty()) {
+
+
+                    Text(
+
+                        text =
+                            "Selected Date: $dueDate",
+
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        },
+
+
+        confirmButton = {
+
+
+            Button(
+
+                onClick = {
+
+
+                    if (
+                        title
+                            .trim()
+                            .isNotEmpty()
+                    ) {
+
+
+                        onSave(
+
+                            title.trim(),
+
+                            description.trim(),
+
+                            priority,
+
+                            dueDate
+                        )
+                    }
+                }
+            ) {
+
+                Text(
+
+                    if (task == null)
+
+                        "Add"
+
+                    else
+
+                        "Update"
+                )
+            }
+        },
+
+
+        dismissButton = {
+
+
+            OutlinedButton(
+
+                onClick = onDismiss
+            ) {
+
+                Text(
+                    "Cancel"
+                )
+            }
+        }
+    )
+}
+
+
+/* =====================================================
+   SAVE TASKS
+   ===================================================== */
+
+fun saveTasks(
+
+    context: Context,
+
+    tasks: List<Task>
+
+) {
+
+
+    val jsonArray =
+        JSONArray()
+
+
+    tasks.forEach { task ->
+
+
+        val jsonObject =
+            JSONObject()
+
+
+        jsonObject.put(
+            "id",
+            task.id
+        )
+
+
+        jsonObject.put(
+            "title",
+            task.title
+        )
+
+
+        jsonObject.put(
+            "description",
+            task.description
+        )
+
+
+        jsonObject.put(
+            "priority",
+            task.priority
+        )
+
+
+        jsonObject.put(
+            "dueDate",
+            task.dueDate
+        )
+
+
+        jsonObject.put(
+            "completed",
+            task.completed
+        )
+
+
+        jsonArray.put(
+            jsonObject
+        )
+    }
+
+
+    context
+
+        .getSharedPreferences(
+            "TodoList",
+            Context.MODE_PRIVATE
+        )
+
+        .edit()
+
+        .putString(
+            "tasks",
+            jsonArray.toString()
+        )
+
+        .apply()
+}
+
+
+/* =====================================================
+   LOAD TASKS
+   ===================================================== */
+
+fun loadTasks(
+
+    context: Context
+
+): MutableList<Task> {
+
+
+    val tasks =
+        mutableListOf<Task>()
+
+
+    val preferences =
+
+        context.getSharedPreferences(
+
+            "TodoList",
+
+            Context.MODE_PRIVATE
+        )
+
+
+    val savedData =
+
+        preferences.getString(
+
+            "tasks",
+
+            null
+        )
+
+
+    if (savedData == null) {
+
+        return tasks
+    }
+
+
+    try {
+
+
+        val jsonArray =
+            JSONArray(savedData)
+
+
+        for (
+        i in 0 until
+                jsonArray.length()
+        ) {
+
+
+            val obj =
+                jsonArray.getJSONObject(i)
+
+
+            val task = Task(
+
+                id =
+                    obj.getLong("id"),
+
+                title =
+                    obj.getString("title"),
+
+                description =
+                    obj.getString("description"),
+
+                priority =
+                    obj.getString("priority"),
+
+                dueDate =
+                    obj.getString("dueDate"),
+
+                completed =
+                    obj.getBoolean("completed")
+            )
+
+
+            tasks.add(
+                task
+            )
+        }
+
+
+    } catch (e: Exception) {
+
+        e.printStackTrace()
+    }
+
+
+    return tasks
+}
